@@ -9,6 +9,7 @@
 #This version brings in new changes from commit 9ec0642ccc596b33
 #============================================================================
 cuda_template = """
+//cuda
 #include <stdint.h>
 
 //-----------------------------------------------------------

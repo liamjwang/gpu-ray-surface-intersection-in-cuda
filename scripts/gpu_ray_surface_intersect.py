@@ -44,7 +44,8 @@ class PyGpuRSI(object):
         if 'Windows' in platform.system():
             self.gpu_bin_target += '.exe'
         if 'Linux' in platform.system():
-            self.nvcc_compile = cfg.get('nvcc_compile', '/usr/local/cuda/bin/nvcc')
+            self.nvcc_compile = cfg.get('nvcc_compile', 'nvcc')
+            # self.nvcc_compile = cfg.get('nvcc_compile', '/usr/local/cuda/bin/nvcc')
         #expected input/output
         f = lambda x: os.path.join(self.data_dir, x)
         self.vertices_file = f('vertices_f32')
@@ -91,7 +92,9 @@ class PyGpuRSI(object):
                 print("nvcc compilation succeeded!")
             else:
                 print("nvcc compilation failed (exit code: %d)" % out.returncode)
-        except:
+        except Exception as e:
+            print("nvcc compilation failed (exception raised)")
+            print(e)
             pass
 
     def acquire_data_(self, vertices, triangles, rayfrom=None, rayto=None):
