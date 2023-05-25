@@ -189,23 +189,44 @@ def run_example3(mode):
     # - Note: PyCudaRSI.__init__ uses the cuda_template from 'pycuda_source'
     #   by default when the key 'CUDA_SOURCE_MODULE' is omitted from params.
     cfg = {'quiet': True, 'mode': mode}
-    params = {}
+    params = {} 
     with PyCudaRSI(params) as pycu:
         results1 = pycu.test(vertices, triangles, raysFrom, raysTo, cfg)
 
-    params['CUDA_SOURCE_MODULE'] = 'pycuda_source_legacy'
-    with PyCudaRSI(params) as pycu:
-        results2 = pycu.test(vertices, triangles, raysFrom, raysTo, cfg)
+    # self.h_crossingDetected, self.h_interceptCounts, self.h_interceptTs
+    interceptCounts, interceptTs = results1
+    print(f'interceptCounts[-10:]: {interceptCounts[-10:]}')
+    print(f'interceptTs[-10:]: {interceptTs[-10:]}')    
 
-    finding = "- results are the same"
-    if type(results1) == tuple:
-        for x, y in zip(results1, results2):
-            if not np.all(np.isclose(x, y)):
-                finding = "- results are different"
-    else:
-        if not np.all(np.isclose(results1, results2)):
-            finding = "- results are different"
-    print(finding)
+    # print max min and count nonzero
+    print(f"interceptCounts.max(): {interceptCounts.max()}")
+    print(f"interceptCounts.min(): {interceptCounts.min()}")
+    print(f"interceptCounts number of nonzero: {np.count_nonzero(interceptCounts)}")
+    print(f"interceptTs.max(): {interceptTs.max()}")
+    print(f"interceptTs.min(): {interceptTs.min()}")
+    print(f"interceptTs count close to zero: {np.count_nonzero(np.isclose(interceptTs.sum(axis=1), 0))}")
+
+
+    print(f"interceptCounts.shape: {interceptCounts.shape}")
+    print(f"interceptTs.shape: {interceptTs.shape}")    
+    print(f"interceptTs.shape: {interceptTs.sum(axis=1).shape}")    
+    print(np.unique(interceptCounts, return_counts=True))    
+
+
+    print("done")
+    # params['CUDA_SOURCE_MODULE'] = 'pycuda_source_legacy'
+    # with PyCudaRSI(params) as pycu:
+    #     results2 = pycu.test(vertices, triangles, raysFrom, raysTo, cfg)
+
+    # finding = "- results are the same"
+    # if type(results1) == tuple:
+    #     for x, y in zip(results1, results2):
+    #         if not np.all(np.isclose(x, y)):
+    #             finding = "- results are different"
+    # else:
+    #     if not np.all(np.isclose(results1, results2)):
+    #         finding = "- results are different"
+    # print(finding)
 
 
 if __name__ == "__main__":
@@ -213,15 +234,15 @@ if __name__ == "__main__":
     from pytools.prefork import ExecError
 
     try:
-        for mode in ['boolean', 'barycentric', 'intercept_count']:
-            print(f'\nRunning example 1, mode={mode}')
-            run_example1(mode, makeplot=False)
+        # for mode in ['boolean', 'barycentric', 'intercept_count']:
+        #     print(f'\nRunning example 1, mode={mode}')
+        #     run_example1(mode, makeplot=False)
 
-        for mode in ['boolean', 'barycentric', 'intercept_count']:
-            print(f'\nRunning example 2, mode={mode}')
-            run_example2(mode)
+        # for mode in ['boolean', 'barycentric', 'intercept_count']:
+        #     print(f'\nRunning example 2, mode={mode}')
+        #     run_example2(mode)
 
-        for mode in ['boolean', 'barycentric', 'intercept_count']:
+        for mode in ['intercept_count']:
             print(f'\nRunning example 3, mode={mode}')
             run_example3(mode)
     except (FileNotFoundError, ExecError) as error:

@@ -199,7 +199,7 @@ class PyCudaRSI(object):
         self.h_crossingDetected = np.zeros(self.n_rays, dtype=np.int32)
         MAX_INTERSECTIONS = 32 # TODO
         self.h_interceptCounts = np.zeros(self.n_rays, dtype=np.int32)
-        self.h_interceptTs = np.zeros(self.n_rays * MAX_INTERSECTIONS, dtype=np.float32)
+        self.h_interceptTs = np.zeros((self.n_rays, MAX_INTERSECTIONS), dtype=np.float32)
         self.d_vertices = cuda.mem_alloc(self.h_vertices.nbytes)
         self.d_triangles = cuda.mem_alloc(self.h_triangles.nbytes)
         self.d_raysFrom = cuda.mem_alloc(self.h_raysFrom.nbytes)
@@ -386,12 +386,12 @@ class PyCudaRSI(object):
                 self.d_vertices, self.d_triangles,
                 self.d_raysFrom, self.d_raysTo,
                 self.d_internalNodes, self.d_rayBox, self.d_hitIDs,
-                self.d_interceptCounts, self.d_interceptTs, self.d_crossingDetected,
+                self.d_interceptCounts, self.d_interceptTs,
                 np.int32(self.n_triangles), np.int32(self.n_rays),
                 block=self.block_dims, grid=self.grid_lambda)
             cuda.memcpy_dtoh(self.h_interceptCounts, self.d_interceptCounts)
             cuda.memcpy_dtoh(self.h_interceptTs, self.d_interceptTs)
-            cuda.memcpy_dtoh(self.h_crossingDetected, self.d_crossingDetected)
+            # cuda.memcpy_dtoh(self.h_crossingDetected, self.d_crossingDetected)
 
         t_end = time.time()
         if not self.quiet:
@@ -399,5 +399,7 @@ class PyCudaRSI(object):
 
         if self.mode == 'barycentric':
             return intersecting_rays, distances, hit_triangles, hit_points
+        if self.mode == 'intercept_count':
+            return self.h_interceptCounts, self.h_interceptTs
         else:
             return self.h_crossingDetected

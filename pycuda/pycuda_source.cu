@@ -306,7 +306,7 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                                               const float* __restrict__ rayTo,
                                               int * __restrict__ interceptCounts,
                                               float * __restrict__ interceptTs,
-                                              int* __restrict__ results,
+                                            //   int* __restrict__ results,
                                               int rayIdx, int triangleID)
 {
     const float tol(EPSILON);
@@ -325,9 +325,9 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                 break;
             }
         if (newIntercept) {
-            tp[*interceptCounts & (MAX_INTERSECTIONS - 1)] = t;
-            *interceptCounts++;
-            results[rayIdx] += 1;
+            tp[(*interceptCounts) & (MAX_INTERSECTIONS - 1)] = t;
+            (*interceptCounts) += 1;
+            // results[rayIdx] += 1;
         }
     }
 }
@@ -732,7 +732,7 @@ __device__ void bvhFindCollisions3(const float* vertices,
                                    CollisionList &collisions,
                                    int *interceptCounts,
                                    float *interceptTs,
-                                   int* detected,
+                                //    int* detected,
                                    int rayIdx)
 {
     NodePtr stack[MAX_STACK_PTRS];
@@ -752,7 +752,7 @@ __device__ void bvhFindCollisions3(const float* vertices,
         while (candidate < collisions.count) {
             int triangleID = collisions.hits[candidate++];
             checkRayTriangleIntersection3(vertices, triangles, rayFrom, rayTo,
-                                          interceptCounts, interceptTs, detected, rayIdx, triangleID);
+                                          interceptCounts, interceptTs, rayIdx, triangleID);
         }
     }
     while (nextNode != NULL);
@@ -835,7 +835,7 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
                                        CollisionList* __restrict__ raytriBoxHitIDs,
                                        int* __restrict__ rayInterceptCounts,
                                        float* __restrict__ rayInterceptTs,
-                                       int* __restrict__ detected,
+                                    //    int* __restrict__ detected,
                                        int numTriangles, int numRays)
 {
     __shared__ NodePtr bvhRoot;
@@ -852,10 +852,10 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
     for (int idx = threadStartIdx; idx < numRays; idx += stride) {
         if (idx < numRays) {
             CollisionList &collisions = raytriBoxHitIDs[bufferIdx];
-            int *interceptCounts = rayInterceptCounts + bufferIdx;
-            float *interceptTs = rayInterceptTs + bufferIdx * MAX_INTERSECTIONS;
+            int *interceptCounts = rayInterceptCounts + idx;
+            float *interceptTs = rayInterceptTs + idx * MAX_INTERSECTIONS;
             bvhFindCollisions3(vertices, triangles, rayFrom, rayTo, rayBox,
-                               bvhRoot, collisions, interceptCounts, interceptTs, detected, idx);
+                               bvhRoot, collisions, interceptCounts, interceptTs, idx);
         }
     }
 }
