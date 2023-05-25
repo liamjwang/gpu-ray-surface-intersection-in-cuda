@@ -197,6 +197,9 @@ class PyCudaRSI(object):
         # Allocate memory on host and device
         self.h_morton = np.zeros(self.n_triangles, dtype=np.uint64)
         self.h_crossingDetected = np.zeros(self.n_rays, dtype=np.int32)
+        MAX_INTERSECTIONS = 32 # TODO
+        self.h_interceptCounts = np.zeros(self.n_rays, dtype=np.int32)
+        self.h_interceptTs = np.zeros(self.n_rays * MAX_INTERSECTIONS, dtype=np.float32)
         self.d_vertices = cuda.mem_alloc(self.h_vertices.nbytes)
         self.d_triangles = cuda.mem_alloc(self.h_triangles.nbytes)
         self.d_raysFrom = cuda.mem_alloc(self.h_raysFrom.nbytes)
@@ -212,8 +215,10 @@ class PyCudaRSI(object):
         self.d_hitIDs = cuda.mem_alloc(self.grid_xLambda * self.block_x *
                         get_(self.bytes_in_CollisionList))
         if self.mode == 'intercept_count':
-            self.d_interceptDists = cuda.mem_alloc(self.grid_xLambda * self.block_x *
-                                    get_(self.bytes_in_InterceptDistances))
+            # self.d_interceptDists = cuda.mem_alloc(self.grid_xLambda * self.block_x *
+                        # get_(self.bytes_in_InterceptDistances))
+            self.d_interceptCounts = cuda.mem_alloc(self.h_interceptCounts.nbytes)
+            self.d_interceptTs = cuda.mem_alloc(self.h_interceptTs.nbytes)
         if self.mode != 'barycentric':
             self.d_crossingDetected = cuda.mem_alloc(self.h_crossingDetected.nbytes)
         else:
@@ -381,9 +386,11 @@ class PyCudaRSI(object):
                 self.d_vertices, self.d_triangles,
                 self.d_raysFrom, self.d_raysTo,
                 self.d_internalNodes, self.d_rayBox, self.d_hitIDs,
-                self.d_interceptDists, self.d_crossingDetected,
+                self.d_interceptCounts, self.d_interceptTs, self.d_crossingDetected,
                 np.int32(self.n_triangles), np.int32(self.n_rays),
                 block=self.block_dims, grid=self.grid_lambda)
+            cuda.memcpy_dtoh(self.h_interceptCounts, self.d_interceptCounts)
+            cuda.memcpy_dtoh(self.h_interceptTs, self.d_interceptTs)
             cuda.memcpy_dtoh(self.h_crossingDetected, self.d_crossingDetected)
 
         t_end = time.time()

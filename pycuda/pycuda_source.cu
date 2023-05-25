@@ -304,13 +304,14 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                                               const int* __restrict__ triangles,
                                               const float* __restrict__ rayFrom,
                                               const float* __restrict__ rayTo,
-                                              InterceptDistances &interceptDists,
+                                              int * __restrict__ interceptCounts,
+                                              float * __restrict__ interceptTs,
                                               int* __restrict__ results,
                                               int rayIdx, int triangleID)
 {
     const float tol(EPSILON);
     float t, u, v, triVerts[9], edge1[3], edge2[3];
-    float *tp = interceptDists.t; //circular buffer
+    float *tp = interceptTs; //circular buffer
     const float *v0=&triVerts[0], *v1=&triVerts[3], *v2=&triVerts[6];
     const float *start = &rayFrom[3*rayIdx], *finish = &rayTo[3*rayIdx];
 
@@ -324,8 +325,8 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                 break;
             }
         if (newIntercept) {
-            tp[interceptDists.count & (MAX_INTERSECTIONS - 1)] = t;
-            interceptDists.count++;
+            tp[*interceptCounts & (MAX_INTERSECTIONS - 1)] = t;
+            *interceptCounts++;
             results[rayIdx] += 1;
         }
     }
@@ -729,7 +730,8 @@ __device__ void bvhFindCollisions3(const float* vertices,
                                    const AABB* rayBox,
                                    const NodePtr bvhRoot,
                                    CollisionList &collisions,
-                                   InterceptDistances &interceptDists,
+                                   int *interceptCounts,
+                                   float *interceptTs,
                                    int* detected,
                                    int rayIdx)
 {
@@ -738,9 +740,9 @@ __device__ void bvhFindCollisions3(const float* vertices,
     *stackPtr++ = NULL;
     NodePtr nextNode(bvhRoot);
 
-    interceptDists.count = 0;
+    *interceptCounts = 0;
     for (int i = 0; i < MAX_INTERSECTIONS; i++) {
-        interceptDists.t[i] = -1;
+        interceptTs[i] = -1;
     }
     do {
         collisions.count = 0;
@@ -750,7 +752,7 @@ __device__ void bvhFindCollisions3(const float* vertices,
         while (candidate < collisions.count) {
             int triangleID = collisions.hits[candidate++];
             checkRayTriangleIntersection3(vertices, triangles, rayFrom, rayTo,
-                                          interceptDists, detected, rayIdx, triangleID);
+                                          interceptCounts, interceptTs, detected, rayIdx, triangleID);
         }
     }
     while (nextNode != NULL);
@@ -831,7 +833,8 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
                                        const BVHNode* __restrict__ internalNodes,
                                        const AABB* __restrict__ rayBox,
                                        CollisionList* __restrict__ raytriBoxHitIDs,
-                                       InterceptDistances* __restrict__ rayInterceptDists,
+                                       int* __restrict__ rayInterceptCounts,
+                                       float* __restrict__ rayInterceptTs,
                                        int* __restrict__ detected,
                                        int numTriangles, int numRays)
 {
@@ -849,9 +852,10 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
     for (int idx = threadStartIdx; idx < numRays; idx += stride) {
         if (idx < numRays) {
             CollisionList &collisions = raytriBoxHitIDs[bufferIdx];
-            InterceptDistances &interceptDists = rayInterceptDists[bufferIdx];
+            int *interceptCounts = rayInterceptCounts + bufferIdx;
+            float *interceptTs = rayInterceptTs + bufferIdx * MAX_INTERSECTIONS;
             bvhFindCollisions3(vertices, triangles, rayFrom, rayTo, rayBox,
-                               bvhRoot, collisions, interceptDists, detected, idx);
+                               bvhRoot, collisions, interceptCounts, interceptTs, detected, idx);
         }
     }
 }
