@@ -118,10 +118,10 @@ __global__ void kernelRayBox(const float* __restrict__ rayFrom,
 }
 
 __global__ void kernelIntersectDistances(
-                const float* __restrict__ rayFrom,
-                const float* __restrict__ rayTo,
-                const float* __restrict__ t,
-                float* __restrict__ distance, int numRays)
+        const float* __restrict__ rayFrom,
+        const float* __restrict__ rayTo,
+        const float* __restrict__ t,
+        float* __restrict__ distance, int numRays)
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < numRays) {
@@ -133,10 +133,10 @@ __global__ void kernelIntersectDistances(
 }
 
 __global__ void kernelIntersectPoints(
-                const float* __restrict__ rayFrom,
-                const float* __restrict__ rayTo,
-                const float* __restrict__ t,
-                float* __restrict__ point, int numRays)
+        const float* __restrict__ rayFrom,
+        const float* __restrict__ rayTo,
+        const float* __restrict__ t,
+        float* __restrict__ point, int numRays)
 {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < numRays) {
@@ -162,10 +162,10 @@ __global__ void setIntArrayKernel(int* array, int value, int numElements)
 // - Ray model: R(t) = Q0 + t *(Q1 - Q0) given line segment end points Q0, Q1
 // - Intersection on plane of triangle: T(u,v) = (1-u-v)*V0 + u*V1 + v*V2
 __device__ int intersectMoller(
-                const float *v0, const float *v1, const float *v2,
-                const float *edge1, const float *edge2,
-                const float *q0, const float *q1,
-                float &t, float &u, float &v)
+        const float *v0, const float *v1, const float *v2,
+        const float *edge1, const float *edge2,
+        const float *q0, const float *q1,
+        float &t, float &u, float &v)
 {
 #if COMPILE_DOUBLE_PRECISION_MOLLER
     double direction[3], avec[3], bvec[3], tvec[3], det;
@@ -304,14 +304,13 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                                               const int* __restrict__ triangles,
                                               const float* __restrict__ rayFrom,
                                               const float* __restrict__ rayTo,
-                                              int &interceptCounts,
-                                              float *interceptTs,
+                                              InterceptDistances &interceptDists,
                                               int* __restrict__ results,
                                               int rayIdx, int triangleID)
 {
     const float tol(EPSILON);
     float t, u, v, triVerts[9], edge1[3], edge2[3];
-    float *tp = interceptTs; //circular buffer
+    float *tp = interceptDists.t; //circular buffer
     const float *v0=&triVerts[0], *v1=&triVerts[3], *v2=&triVerts[6];
     const float *start = &rayFrom[3*rayIdx], *finish = &rayTo[3*rayIdx];
 
@@ -325,8 +324,8 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
                 break;
             }
         if (newIntercept) {
-            tp[interceptCounts & (MAX_INTERSECTIONS - 1)] = t;
-            interceptCounts++;
+            tp[interceptDists.count & (MAX_INTERSECTIONS - 1)] = t;
+            interceptDists.count++;
             results[rayIdx] += 1;
         }
     }
@@ -337,16 +336,16 @@ __device__ void checkRayTriangleIntersection3(const float* __restrict__ vertices
 // Copyright (c) 2016 Jeroen Baert, MIT license
 //--------------------------------------------------------------
 
-__device__ uint_fast32_t magicbit3D_masks32_encode[6] = 
-{ 0x000003ff, 0, 0x30000ff, 0x0300f00f, 0x30c30c3, 0x9249249 };
+__device__ uint_fast32_t magicbit3D_masks32_encode[6] =
+        { 0x000003ff, 0, 0x30000ff, 0x0300f00f, 0x30c30c3, 0x9249249 };
 __device__ uint_fast64_t magicbit3D_masks64_encode[6] =
-{ 0x1fffff, 0x1f00000000ffff, 0x1f0000ff0000ff,
-  0x100f00f00f00f00f, 0x10c30c30c30c30c3, 0x1249249249249249 };
+        { 0x1fffff, 0x1f00000000ffff, 0x1f0000ff0000ff,
+          0x100f00f00f00f00f, 0x10c30c30c30c30c3, 0x1249249249249249 };
 
 __device__ MORTON inline morton3D_SplitBy3bits(COORD a) {
     const MORTON* masks = (sizeof(MORTON) <= 4) ?
-                           reinterpret_cast<const MORTON*>(magicbit3D_masks32_encode) :
-                           reinterpret_cast<const MORTON*>(magicbit3D_masks64_encode);
+                          reinterpret_cast<const MORTON*>(magicbit3D_masks32_encode) :
+                          reinterpret_cast<const MORTON*>(magicbit3D_masks64_encode);
     MORTON x = ((MORTON)a) & masks[0];
     if (sizeof(MORTON) == 8) { x = (x | (uint_fast64_t)x << 32) & masks[1]; }
     x = (x | x << 16) & masks[2];
@@ -358,8 +357,8 @@ __device__ MORTON inline morton3D_SplitBy3bits(COORD a) {
 
 __device__ MORTON inline m3D_e_magicbits(COORD x, COORD y, COORD z) {
     return morton3D_SplitBy3bits(x) |
-          (morton3D_SplitBy3bits(y) << 1) |
-          (morton3D_SplitBy3bits(z) << 2);
+           (morton3D_SplitBy3bits(y) << 1) |
+           (morton3D_SplitBy3bits(z) << 2);
 }
 
 //-----------------------------------------------------------------
@@ -384,15 +383,15 @@ BVH_PREPROCESSOR_DIRECTIVE
 
 struct ALIGN(16) BVHNode
 {
-    AABB bounds;
-    BVHNode *childLeft, *childRight;
+AABB bounds;
+BVHNode *childLeft, *childRight;
 #if COMPILE_NON_ESSENTIAL
-    BVHNode *parent, *self;
+BVHNode *parent, *self;
     int idxSelf, idxChildL, idxChildR, isLeafChildL, isLeafChildR;
 #endif
-    int triangleID;
-    int atomic;
-    int rangeLeft, rangeRight;
+int triangleID;
+int atomic;
+int rangeLeft, rangeRight;
 };
 struct CollisionList
 {
@@ -419,8 +418,8 @@ __global__ void kernelMortonCode(const float* __restrict__ vertices,
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < nTriangles) {
         const float *v0 = &vertices[3*triangles[3*i]],
-                    *v1 = &vertices[3*triangles[3*i+1]],
-                    *v2 = &vertices[3*triangles[3*i+2]];
+                *v1 = &vertices[3*triangles[3*i+1]],
+                *v2 = &vertices[3*triangles[3*i+2]];
         //normalise centroid vertices (convert from real to integer)
         //scale each dimension to use up to 21 bits
         for (int c = 0; c < 3; c++) {
@@ -435,8 +434,8 @@ __global__ void kernelMortonCode(const float* __restrict__ vertices,
 __device__ void computeTriangleBounds(const float *triangleVerts, AABB &box)
 {
     const float *v0 = &triangleVerts[0],
-                *v1 = &triangleVerts[3],
-                *v2 = &triangleVerts[6];
+            *v1 = &triangleVerts[3],
+            *v2 = &triangleVerts[6];
     if (v0[0] > v1[0]) {
         if (v0[0] > v2[0]) { box.xMin = min(v1[0], v2[0]); box.xMax = v0[0]; }
         else { box.xMin = v1[0]; box.xMax = v2[0]; }
@@ -505,7 +504,7 @@ __device__ void bvhUpdateParent(BVHNode* node, BVHNode* internalNodes,
         if (! isLeaf(node))
         {   //expand bounds using children's axis-aligned bounding boxes
             const BVHNode *dL = node->childLeft, //descendants
-                          *dR = node->childRight;
+            *dR = node->childRight;
             node->bounds.xMin = min(dL->bounds.xMin, dR->bounds.xMin);
             node->bounds.xMax = max(dL->bounds.xMax, dR->bounds.xMax);
             node->bounds.yMin = min(dL->bounds.yMin, dR->bounds.yMin);
@@ -520,7 +519,7 @@ __device__ void bvhUpdateParent(BVHNode* node, BVHNode* internalNodes,
         int left = node->rangeLeft, right = node->rangeRight;
         BVHNode *parent;
         if (left == 0 || (right != nNodes - 1 &&
-            highestBit(right, morton) < highestBit(left - 1, morton)))
+                          highestBit(right, morton) < highestBit(left - 1, morton)))
         {
             parent = &internalNodes[right];
             parent->childLeft = node;
@@ -563,8 +562,8 @@ __device__ bool inline bvhInsert(CollisionList &collisions, int value)
 }
 
 __device__ void bvhTraverse(
-           const AABB& queryBox, NodePtr &bvhNode,
-           NodePtr* &stackPtr, CollisionList &hits)
+        const AABB& queryBox, NodePtr &bvhNode,
+        NodePtr* &stackPtr, CollisionList &hits)
 {
     //traverse nodes starting from the root iteratively
     NodePtr node(bvhNode);
@@ -610,7 +609,7 @@ __global__ void kernelBVHReset(const float* __restrict__ vertices,
                                BVHNode* __restrict__ leafNodes,
                                int* __restrict__ sortedObjectIDs, int nNodes)
 {
-   //reset parameters for internal and leaf nodes
+    //reset parameters for internal and leaf nodes
     unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= nNodes)
         return;
@@ -730,8 +729,7 @@ __device__ void bvhFindCollisions3(const float* vertices,
                                    const AABB* rayBox,
                                    const NodePtr bvhRoot,
                                    CollisionList &collisions,
-                                   int &interceptCounts,
-                                   float *interceptTs,
+                                   InterceptDistances &interceptDists,
                                    int* detected,
                                    int rayIdx)
 {
@@ -740,9 +738,9 @@ __device__ void bvhFindCollisions3(const float* vertices,
     *stackPtr++ = NULL;
     NodePtr nextNode(bvhRoot);
 
-    interceptCounts = 0;
+    interceptDists.count = 0;
     for (int i = 0; i < MAX_INTERSECTIONS; i++) {
-        interceptTs[i] = -1;
+        interceptDists.t[i] = -1;
     }
     do {
         collisions.count = 0;
@@ -752,7 +750,7 @@ __device__ void bvhFindCollisions3(const float* vertices,
         while (candidate < collisions.count) {
             int triangleID = collisions.hits[candidate++];
             checkRayTriangleIntersection3(vertices, triangles, rayFrom, rayTo,
-                                          interceptCounts, interceptTs, detected, rayIdx, triangleID);
+                                          interceptDists, detected, rayIdx, triangleID);
         }
     }
     while (nextNode != NULL);
@@ -833,8 +831,7 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
                                        const BVHNode* __restrict__ internalNodes,
                                        const AABB* __restrict__ rayBox,
                                        CollisionList* __restrict__ raytriBoxHitIDs,
-                                       int* __restrict__ rayInterceptCounts,
-                                       float* __restrict__ rayInterceptTs,
+                                       InterceptDistances* __restrict__ rayInterceptDists,
                                        int* __restrict__ detected,
                                        int numTriangles, int numRays)
 {
@@ -852,11 +849,9 @@ __global__ void kernelBVHIntersection3(const float* __restrict__ vertices,
     for (int idx = threadStartIdx; idx < numRays; idx += stride) {
         if (idx < numRays) {
             CollisionList &collisions = raytriBoxHitIDs[bufferIdx];
-            int &interceptCounts = rayInterceptCounts[bufferIdx];
-            float *interceptTs = rayInterceptTs + bufferIdx * MAX_INTERSECTIONS;
+            InterceptDistances &interceptDists = rayInterceptDists[bufferIdx];
             bvhFindCollisions3(vertices, triangles, rayFrom, rayTo, rayBox,
-                               bvhRoot, collisions, interceptCounts, interceptTs, detected, idx);
+                               bvhRoot, collisions, interceptDists, detected, idx);
         }
     }
 }
-
