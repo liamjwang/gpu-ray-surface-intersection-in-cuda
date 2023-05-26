@@ -12,6 +12,8 @@
 import numpy as np
 import os
 
+import pyvista as pv
+
 from pycuda_ray_surface_intersect import PyCudaRSI
 from diagnostic_input import synthesize_data
 from diagnostic_graphics import visualise_example1
@@ -179,10 +181,21 @@ def run_example2(mode):
         assert(np.all(np.isclose(hit_points, gt_intercepts[gt_rays], atol=1e-3)))
 
 def run_example3(mode):
-    vertices = bin2array('data/vertices_f32', np.float32)
-    triangles = bin2array('data/triangles_i32', np.int32)
+    # vertices = bin2array('data/vertices_f32', np.float32)
+    # triangles = bin2array('data/triangles_i32', np.int32)
+
+    mesh = pv.PolyData('/home/wangl/repos/deepdrr/tests/resources/suzanne.stl')
+    vertices = np.array(mesh.points, dtype=np.float32)*1000
+    triangles = mesh.faces.reshape((-1, 4))[..., 1:][..., [0, 2, 1]].astype(np.int32)  # flip winding order
+
+
+
     raysFrom = bin2array('data/rayFrom_f32', np.float32)
     raysTo = bin2array('data/rayTo_f32', np.float32)
+
+    print(raysFrom)
+    print(raysTo)
+    print(vertices)
     # Compare results produced by different versions of the code
     # - Let's assume "pycuda_source_legacy.py" represents the stable version
     #   while "pycuda_source.py" is under development (contains new changes)

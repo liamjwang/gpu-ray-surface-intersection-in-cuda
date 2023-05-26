@@ -118,6 +118,13 @@ def synthesize_data(outdir,
     vertices[:,-1] -= min(vertices[:,-1])
     triangles = np.array(triangles, dtype=int)
 
+    import pyvista as pv
+    mesh = pv.PolyData('/home/wangl/repos/deepdrr/tests/resources/suzanne.stl')
+    vertices = np.array(mesh.points, dtype=np.float32)*1000
+    triangles = mesh.faces.reshape((-1, 4))[..., 1:][..., [0, 2, 1]].astype(np.int32)  # flip winding order
+
+
+
     feedback['nVertices'] = len(vertices)
     feedback['nTriangles'] = len(triangles)
     feedback['nRays'] = n_rays
